@@ -4580,3 +4580,156 @@ void Player::setGuild(Guild* guild)
 		oldGuild->removeMember(this);
 	}
 }
+
+void Player::addItemOnStash(uint16_t clientId, uint32_t amount)
+{
+	auto it = stashItems.find(clientId);
+	if (it != stashItems.end()) {
+		stashItems[clientId] += amount;
+		return;
+	}
+
+	stashItems[clientId] = amount;
+}
+
+uint16_t Player::getStashItemCount(uint16_t clientId) const
+{
+	auto it = stashItems.find(clientId);
+	if (it != stashItems.end()) {
+		return static_cast<uint16_t>(it->second);
+	}
+	return 0;
+}
+
+bool Player::withdrawItem(uint16_t clientId, uint32_t amount)
+{
+	auto it = stashItems.find(clientId);
+	if (it != stashItems.end()) {
+		if (it->second > amount) {
+			stashItems[clientId] -= amount;
+		}
+		else if (it->second == amount) {
+			stashItems.erase(clientId);
+		}
+		else {
+			return false;
+		}
+		return true;
+	}
+	return false;
+}
+
+bool Player::addItemFromStash(uint16_t itemId, uint32_t itemCount) {
+	uint32_t stackCount = 100u;
+
+	while (itemCount > 0) {
+		auto addValue = itemCount > stackCount ? stackCount : itemCount;
+		itemCount -= addValue;
+		Item* newItem = Item::CreateItem(itemId, addValue);
+
+		g_game.internalPlayerAddItem(this, newItem, true);
+	}
+
+	sendOpenStash();
+	return true;
+}
+
+void Player::stowItem(Item* item, uint32_t count, bool allItems) {
+	if (!item || !item->isItemStorable()) {
+		sendCancelMessage("This item cannot be stowed here.");
+		return;
+	}
+
+	StashContainerList itemDict;
+	if (allItems) {
+		for (int32_t i = CONST_SLOT_FIRST; i <= CONST_SLOT_LAST; i++) {
+			Item* inventoryItem = inventory[i];
+			if (!inventoryItem) {
+				continue;
+			}
+
+			if (inventoryItem->getClientID() == item->getClientID()) {
+				itemDict.push_back(std::pair<Item*, uint32_t>(inventoryItem, inventoryItem->getItemCount()));
+			}
+
+			if (Container* container = inventoryItem->getContainer()) {
+				for (auto stowable_it : container->getStowableItems()) {
+					if ((stowable_it.first)->getClientID() == item->getClientID()) {
+						itemDict.push_back(stowable_it);
+					}
+				}
+			}
+		}
+	}
+	else if (item->getContainer()) {
+		itemDict = item->getContainer()->getStowableItems();
+	}
+	else {
+		itemDict.push_back(std::pair<Item*, uint32_t>(item, count));
+	}
+
+	if (itemDict.size() == 0) {
+		sendCancelMessage("There is no stowable items on this container.");
+		return;
+	}
+
+	stashContainer(itemDict);
+}
+
+void Player::stashContainer(StashContainerList itemDict)
+{
+	StashItemList stashItemDict; // ClientID - Count
+	for (auto it_dict : itemDict) {
+		stashItemDict[(it_dict.first)->getClientID()] = it_dict.second;
+	}
+
+	for (auto it : stashItems) {
+		if (!stashItemDict[it.first]) {
+			stashItemDict[it.first] = it.second;
+		}
+		else {
+			stashItemDict[it.first] += it.second;
+		}
+	}
+
+	if (getStashSize(stashItemDict) > g_config.getNumber(ConfigManager::STASH_ITEMS)) {
+		sendCancelMessage("You don't have capacity in the Supply Stash to stow all this item.");
+		return;
+	}
+
+	uint32_t totalStowed = 0;
+	std::ostringstream retString;
+	for (auto stashIterator : itemDict) {
+		uint16_t iteratorCID = (stashIterator.first)->getClientID();
+		if (g_game.internalRemoveItem(stashIterator.first, stashIterator.second) == RETURNVALUE_NOERROR) {
+			addItemOnStash(iteratorCID, stashIterator.second);
+			totalStowed += stashIterator.second;
+		}
+	}
+
+	if (totalStowed == 0) {
+		sendCancelMessage("Sorry, not possible.");
+		return;
+	}
+
+	retString << "Stowed " << totalStowed << " object" << (totalStowed > 1 ? "s." : ".");
+	sendTextMessage(MESSAGE_EVENT_DEFAULT, retString.str());
+	sendOpenStash();
+}
+
+uint16_t Player::getFreeBackpackSlots() const
+{
+	Thing* thing = getThing(CONST_SLOT_BACKPACK);
+	if (!thing) {
+		return 0;
+	}
+
+	Container* backpack = thing->getContainer();
+	if (!backpack) {
+		return 0;
+	}
+
+	uint16_t counter = std::max<uint16_t>(0, backpack->getFreeSlots());
+
+	return counter;
+}

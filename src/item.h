@@ -915,6 +915,9 @@ class Item : virtual public Thing
 		bool hasWalkStack() const {
 			return items[id].walkStack;
 		}
+		bool isStowable() const {
+			return items[id].stackable && items[id].wareId > 0;
+		}
 
 		void setStoreItem(bool storeItem) {
 			setIntAttr(ITEM_ATTRIBUTE_STOREITEM, static_cast<int64_t>(storeItem));
@@ -1000,6 +1003,9 @@ class Item : virtual public Thing
 
 		bool hasMarketAttributes() const;
 
+		// Supply Stash
+		bool isItemStorable() const;
+
 		std::unique_ptr<ItemAttributes>& getAttributes() {
 			if (!attributes) {
 				attributes.reset(new ItemAttributes());
@@ -1051,5 +1057,6 @@ class Item : virtual public Thing
 
 using ItemList = std::list<Item*>;
 using ItemDeque = std::deque<Item*>;
+using StashContainerList = std::vector<std::pair<Item*, uint32_t>>;
 
 #endif

@@ -361,6 +361,17 @@ class Player final : public Creature, public Cylinder
 			return inMarket;
 		}
 
+		// Supply Stash
+		void setSpecialMenuAvailable(bool supplyStashBool) {
+			supplyStash = supplyStashBool;
+			if (client) {
+				client->sendSpecialContainersAvailable();
+			}
+		}
+		bool isSupplyStashMenuAvailable() {
+			return supplyStash;
+		}
+
 		void setLastDepotId(int16_t newId) {
 			lastDepotId = newId;
 		}
@@ -588,6 +599,12 @@ class Player final : public Creature, public Cylinder
 			secureMode = mode;
 		}
 
+		// Supply Stash
+		bool addItemFromStash(uint16_t itemId, uint32_t itemCount);
+		void stowItem(Item* item, uint32_t count, bool allItems);
+		void stashContainer(StashContainerList itemDict);
+		uint16_t getFreeBackpackSlots() const;
+
 		//combat functions
 		bool setAttackedCreature(Creature* creature) override;
 		bool isImmune(CombatType_t type) const override;
@@ -699,6 +716,21 @@ class Player final : public Creature, public Cylinder
 
 		size_t getMaxVIPEntries() const;
 		size_t getMaxDepotItems() const;
+
+		// Supply Stash
+		void addItemOnStash(uint16_t clientId, uint32_t amount);
+		uint16_t getStashItemCount(uint16_t clientId) const;
+		bool withdrawItem(uint16_t clientId, uint32_t amount);
+		StashItemList getStashItems() const {
+			return stashItems;
+		}
+		bool isStashExhausted() const {
+			uint32_t exhaust_time = 1500;
+			return (OTSYS_TIME() - lastStashInteraction < exhaust_time);
+		}
+		void updateStashExhausted() {
+			lastStashInteraction = OTSYS_TIME();
+		}
 
 		//tile
 		//send methods
@@ -1132,6 +1164,13 @@ class Player final : public Creature, public Cylinder
 		void postAddNotification(Thing* thing, const Cylinder* oldParent, int32_t index, cylinderlink_t link = LINK_OWNER) override;
 		void postRemoveNotification(Thing* thing, const Cylinder* newParent, int32_t index, cylinderlink_t link = LINK_OWNER) override;
 
+		// Supply Stash
+		void sendOpenStash(bool isNpc = false) {
+			if (client && ((getLastDepotId() != -1) || isNpc)) {
+				client->sendOpenStash();
+			}
+		}
+
 		void setNextAction(int64_t time) {
 			if (time > nextAction) {
 				nextAction = time;
@@ -1241,6 +1280,7 @@ class Player final : public Creature, public Cylinder
 		int64_t lastPing;
 		int64_t lastPong;
 		int64_t nextAction = 0;
+		int64_t lastStashInteraction = 0;
 
 		BedItem* bedItem = nullptr;
 		Guild* guild = nullptr;
@@ -1294,6 +1334,7 @@ class Player final : public Creature, public Cylinder
 		uint16_t staminaMinutes = 2520;
 		uint16_t maxWriteLen = 0;
 		int16_t lastDepotId = -1;
+		StashItemList stashItems;
 
 		uint8_t soul = 0;
 		uint8_t blessings = 0;
@@ -1316,6 +1357,7 @@ class Player final : public Creature, public Cylinder
 		bool isConnecting = false;
 		bool addAttackSkillPoint = false;
 		bool inventoryAbilities[CONST_SLOT_LAST + 1] = {};
+		bool supplyStash = false;
 
 		static uint32_t playerAutoID;
 

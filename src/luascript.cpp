@@ -2493,6 +2493,10 @@ void LuaScriptInterface::registerFunctions()
 
 	registerMethod("Player", "getStoreInbox", LuaScriptInterface::luaPlayerGetStoreInbox);
 
+	// Supply Stash
+	registerMethod("Player", "setSpecialContainersAvailable", LuaScriptInterface::luaPlayerSetSpecialContainersAvailable);
+	registerMethod("Player", "openStash", LuaScriptInterface::luaPlayerOpenStash);
+
 	// Monster
 	registerClass("Monster", "Creature", LuaScriptInterface::luaMonsterCreate);
 	registerMetaMethod("Monster", "__eq", LuaScriptInterface::luaUserdataCompare);
@@ -10105,6 +10109,37 @@ int LuaScriptInterface::luaPlayerGetStoreInbox(lua_State* L)
 
 	pushUserdata<Container>(L, storeInbox);
 	setMetatable(L, -1, "Container");
+	return 1;
+}
+
+int LuaScriptInterface::luaPlayerSetSpecialContainersAvailable(lua_State* L)
+{
+	// player:setSpecialContainersAvailable(stashMenu)
+	bool supplyStashMenu = getBoolean(L, 2, false);
+	Player* player = getUserdata<Player>(L, 1);
+	if (player) {
+		player->setSpecialMenuAvailable(supplyStashMenu);
+		pushBoolean(L, true);
+	}
+	else {
+		lua_pushnil(L);
+	}
+	return 1;
+}
+
+int LuaScriptInterface::luaPlayerOpenStash(lua_State* L)
+{
+	// player:openStash(isNpc)
+	Player* player = getUserdata<Player>(L, 1);
+	bool isNpc = getBoolean(L, 2, false);
+	if (player) {
+		player->sendOpenStash(isNpc);
+		pushBoolean(L, true);
+	}
+	else {
+		lua_pushnil(L);
+	}
+
 	return 1;
 }
 

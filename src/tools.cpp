@@ -1256,3 +1256,12 @@ SpellGroup_t stringToSpellGroup(const std::string& value)
 
 	return SPELLGROUP_NONE;
 }
+
+uint16_t getStashSize(StashItemList itemList)
+{
+	uint16_t size = 0;
+	for (auto item : itemList) {
+		size += ceil(item.second / 100.0);
+	}
+	return size;
+}

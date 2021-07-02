@@ -96,4 +96,6 @@ int64_t OTSYS_TIME();
 
 SpellGroup_t stringToSpellGroup(const std::string& value);
 
+uint16_t getStashSize(StashItemList itemList);
+
 #endif

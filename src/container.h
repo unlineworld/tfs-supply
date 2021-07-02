@@ -161,6 +161,10 @@ class Container : public Item, public Cylinder
 		void internalAddThing(uint32_t index, Thing* thing) override final;
 		void startDecaying() override final;
 
+		// Supply Stash
+		StashContainerList getStowableItems() const;
+		uint16_t getFreeSlots() const;
+
 	protected:
 		ItemDeque itemlist;
 

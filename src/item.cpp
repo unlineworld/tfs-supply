@@ -1774,6 +1774,12 @@ bool Item::hasMarketAttributes() const
 	return true;
 }
 
+bool Item::isItemStorable() const
+{
+	auto isContainerAndHasSomethingInside = (getContainer() != NULL) && (getContainer()->getItemList().size() > 0);
+	return (isStowable() || isContainerAndHasSomethingInside);
+}
+
 template<>
 const std::string& ItemAttributes::CustomAttribute::get<std::string>() {
 	if (value.type() == typeid(std::string)) {

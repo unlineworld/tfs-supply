@@ -505,6 +505,7 @@ void ProtocolGame::parsePacket(NetworkMessage& msg)
 		case 0x14: g_dispatcher.addTask(createTask(std::bind(&ProtocolGame::logout, getThis(), true, false))); break;
 		case 0x1D: addGameTask(&Game::playerReceivePingBack, player->getID()); break;
 		case 0x1E: addGameTask(&Game::playerReceivePing, player->getID()); break;
+		case 0x28: parseStashWithdraw(msg); break;
 		case 0x32: parseExtendedOpcode(msg); break; //otclient extended opcode
 		case 0x64: parseAutoWalk(msg); break;
 		case 0x65: addGameTask(&Game::playerMove, player->getID(), DIRECTION_NORTH); break;
@@ -3219,4 +3220,77 @@ void ProtocolGame::parseExtendedOpcode(NetworkMessage& msg)
 
 	// process additional opcodes via lua script event
 	addGameTask(&Game::parsePlayerExtendedOpcode, player->getID(), opcode, buffer);
+}
+
+void ProtocolGame::sendOpenStash()
+{
+	NetworkMessage msg;
+	msg.addByte(0x2b);
+	StashItemList list = player->getStashItems();
+	msg.add<uint16_t>(list.size());
+	for (auto item : list) {
+		msg.add<uint16_t>(item.first);
+		msg.add<uint32_t>(item.second);
+	}
+	msg.add<uint16_t>(g_config.getNumber(ConfigManager::STASH_ITEMS) - getStashSize(list));
+	writeToOutputBuffer(msg);
+}
+
+void ProtocolGame::parseStashWithdraw(NetworkMessage& msg)
+{
+	if (!player->isSupplyStashMenuAvailable()) {
+		player->sendCancelMessage("You can't stow items right now.");
+		return;
+	}
+
+	if (player->isStashExhausted()) {
+		player->sendCancelMessage("You need to wait to do this again.");
+		return;
+	}
+
+	Supply_Stash_Actions_t action = static_cast<Supply_Stash_Actions_t>(msg.getByte());
+	switch (action) {
+		case SUPPLY_STASH_ACTION_STOW_ITEM: {
+			Position pos = msg.getPosition();
+			uint16_t spriteId = msg.get<uint16_t>();
+			uint8_t stackpos = msg.getByte();
+			uint8_t count = msg.getByte();
+			addGameTask(&Game::playerStowItem, player, pos, spriteId, stackpos, count, false);
+			break;
+		}
+		case SUPPLY_STASH_ACTION_STOW_CONTAINER: {
+			Position pos = msg.getPosition();
+			uint16_t spriteId = msg.get<uint16_t>();
+			uint8_t stackpos = msg.getByte();
+			addGameTask(&Game::playerStowItem, player, pos, spriteId, stackpos, 0, false);
+			break;
+		}
+		case SUPPLY_STASH_ACTION_STOW_STACK: {
+			Position pos = msg.getPosition();
+			uint16_t spriteId = msg.get<uint16_t>();
+			uint8_t stackpos = msg.getByte();
+			addGameTask(&Game::playerStowItem, player, pos, spriteId, stackpos, 0, true);
+			break;
+		}
+		case SUPPLY_STASH_ACTION_WITHDRAW: {
+			uint16_t spriteId = msg.get<uint16_t>();
+			uint32_t count = msg.get<uint32_t>();
+			uint8_t stackpos = msg.getByte();
+			addGameTask(&Game::playerStashWithdraw, player, spriteId, count, stackpos);
+			break;
+		}
+	}
+
+	player->updateStashExhausted();
+}
+
+void ProtocolGame::sendSpecialContainersAvailable()
+{
+	if (!player)
+		return;
+
+	NetworkMessage msg;
+	msg.addByte(44);
+	msg.addByte(player->isSupplyStashMenuAvailable() ? 0x01 : 0x00);
+	writeToOutputBuffer(msg);
 }

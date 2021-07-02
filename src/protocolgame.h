@@ -328,6 +328,10 @@ class ProtocolGame final : public Protocol
 
 		bool debugAssertSent = false;
 		bool acceptPackets = false;
+
+		void sendOpenStash();
+		void parseStashWithdraw(NetworkMessage& msg);
+		void sendSpecialContainersAvailable();
 };
 
 #endif

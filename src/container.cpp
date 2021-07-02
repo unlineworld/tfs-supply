@@ -763,3 +763,35 @@ void ContainerIterator::advance()
 		}
 	}
 }
+
+StashContainerList Container::getStowableItems() const
+{
+	StashContainerList toReturnList;
+	for (auto item : itemlist) {
+		if (item->getContainer() != NULL) {
+			auto subContainer = item->getContainer()->getStowableItems();
+			for (auto subContItem : subContainer) {
+				Item* containerItem = subContItem.first;
+				toReturnList.push_back(std::pair<Item*, uint32_t>(containerItem, static_cast<uint32_t>(containerItem->getItemCount())));
+			}
+		}
+		else if (item->isItemStorable()) {
+			toReturnList.push_back(std::pair<Item*, uint32_t>(item, static_cast<uint32_t>(item->getItemCount())));
+		}
+	}
+
+	return toReturnList;
+}
+
+uint16_t Container::getFreeSlots() const
+{
+	uint16_t counter = std::max<uint16_t>(0, capacity() - size());
+
+	for (Item* item : itemlist) {
+		if (Container* container = item->getContainer()) {
+			counter += std::max<uint16_t>(0, container->getFreeSlots());
+		}
+	}
+
+	return counter;
+}

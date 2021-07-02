@@ -5691,3 +5691,89 @@ bool Game::reload(ReloadTypes_t reloadType)
 	}
 	return true;
 }
+
+void Game::playerStowItem(Player* player, const Position& pos, uint16_t spriteId, uint8_t stackpos, uint8_t count, bool allItems)
+{
+	if (!player->isPremium()) {
+		player->sendCancelMessage(RETURNVALUE_YOUNEEDPREMIUMACCOUNT);
+		return;
+	}
+
+	Thing* thing = internalGetThing(player, pos, stackpos, 0, STACKPOS_TOPDOWN_ITEM);
+	if (!thing)
+		return;
+
+	Item* item = thing->getItem();
+	if (!item || item->getClientID() != spriteId || item->getItemCount() < count) {
+		player->sendCancelMessage(RETURNVALUE_NOTPOSSIBLE);
+		return;
+	}
+
+	if (pos.x != 0xFFFF && !Position::areInRange<1, 1, 0>(pos, player->getPosition())) {
+		player->sendCancelMessage(RETURNVALUE_NOTPOSSIBLE);
+		return;
+	}
+	player->stowItem(item, count, allItems);
+}
+
+void Game::playerStashWithdraw(Player* player, uint16_t spriteId, uint32_t count, uint8_t)
+{
+	if (player->hasFlag(PlayerFlag_CannotPickupItem)) {
+		return;
+	}
+
+	const ItemType& it = Item::items.getItemIdByClientId(spriteId);
+	if (it.id == 0 || count == 0) {
+		return;
+	}
+
+	uint16_t freeSlots = player->getFreeBackpackSlots();
+
+	if (freeSlots == 0) {
+		player->sendCancelMessage(RETURNVALUE_NOTENOUGHROOM);
+		return;
+	}
+
+	if (player->getFreeCapacity() < 100) {
+		player->sendCancelMessage(RETURNVALUE_NOTENOUGHCAPACITY);
+		return;
+	}
+
+	int32_t NDSlots = ((freeSlots)-(count < 100 ? 1 : (count / 100)));
+	uint32_t SlotsWith = count;
+	uint32_t noSlotsWith = 0;
+
+	if (NDSlots <= 0) {
+		SlotsWith = (freeSlots * 100);
+		noSlotsWith = (count - SlotsWith);
+	}
+
+	uint32_t capWith = count;
+	uint32_t noCapWith = 0;
+	if (player->getFreeCapacity() < (count * it.weight)) {
+		capWith = (player->getFreeCapacity() / it.weight);
+		noCapWith = (count - capWith);
+	}
+
+	std::stringstream ss;
+	uint32_t WithdrawCount = (SlotsWith > capWith ? capWith : SlotsWith);
+	uint32_t NoWithdrawCount = (noSlotsWith < noCapWith ? noCapWith : noSlotsWith);
+	const char* NoWithdrawMsg = (noSlotsWith < noCapWith ? "capacity" : "slots");
+
+	if (WithdrawCount != count) {
+		ss << "Retrieved " << WithdrawCount << "x " << it.name << ".\n";
+		ss << NoWithdrawCount << "x are impossible to retrieve due to insufficient inventory " << NoWithdrawMsg << ".";
+	}
+	else {
+		ss << "Retrieved " << WithdrawCount << "x " << it.name << '.';
+	}
+
+	player->sendTextMessage(MESSAGE_EVENT_DEFAULT, ss.str());
+
+	if (player->withdrawItem(spriteId, WithdrawCount)) {
+		player->addItemFromStash(it.id, WithdrawCount);
+	}
+	else {
+		player->sendCancelMessage(RETURNVALUE_NOTPOSSIBLE);
+	}
+}

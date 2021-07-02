@@ -1009,6 +1009,10 @@ class LuaScriptInterface
 
 		static int luaPlayerGetStoreInbox(lua_State* L);
 
+		// Supply Stash
+		static int luaPlayerSetSpecialContainersAvailable(lua_State* L);
+		static int luaPlayerOpenStash(lua_State* L);
+
 		// Monster
 		static int luaMonsterCreate(lua_State* L);
 

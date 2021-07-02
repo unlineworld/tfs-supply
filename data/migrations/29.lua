@@ -1,3 +1,4 @@
 function onUpdateDatabase()
-	return false
+	db.query("ALTER TABLE `players` ADD `supplystash` longblob DEFAULT NULL")
+	return true
 end

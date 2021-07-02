@@ -412,10 +412,17 @@ bool IOLoginData::loadPlayer(Player* player, DBResult_ptr result)
 	}
 
 	// Stash load items
-	if ((result = db.storeQuery(fmt::format("SELECT `item_count`, `item_id`  FROM `player_stash` WHERE `player_id` = {:d}", player->getGUID())))) {
-		do {
-			player->addItemOnStash(result->getNumber<uint16_t>("item_id"), result->getNumber<uint32_t>("item_count"));
-		} while (result->next());
+	if (result = db.storeQuery(fmt::format("SELECT `supplystash` FROM `players` WHERE `id` = {:d} LIMIT 1", player->getGUID()))) {
+		unsigned long attrSize;
+		PropStream propStream;
+		const char* attr = result->getStream("supplystash", attrSize);
+		propStream.init(attr, attrSize);
+
+		uint16_t itemId;
+		uint32_t itemCount;
+		while (propStream.read<uint16_t>(itemId) && propStream.read<uint32_t>(itemCount)) {
+			player->addItemOnStash(itemId, itemCount);
+		}
 	}
 
 	if ((result = db.storeQuery(fmt::format("SELECT `player_id`, `name` FROM `player_spells` WHERE `player_id` = {:d}", player->getGUID())))) {
@@ -736,16 +743,25 @@ bool IOLoginData::savePlayer(Player* player)
 	}
 
 	// Stash save items
+	PropWriteStream propWriteStream;
+	for (const auto& it : player->getStashItems()) {
+		propWriteStream.write<uint16_t>(it.first);
+		propWriteStream.write<uint32_t>(it.second);
+	}
+
+	size_t attributesSize;
+	const char* attributes = propWriteStream.getStream(attributesSize);
 	query.str(std::string());
-	query << "DELETE FROM `player_stash` WHERE `player_id` = " << player->getGUID();
-	db.executeQuery(query.str());
-	for (auto it : player->getStashItems()) {
-		query.str(std::string());
-		query << "INSERT INTO `player_stash` (`player_id`,`item_id`,`item_count`) VALUES (";
-		query << player->getGUID() << ", ";
-		query << it.first << ", ";
-		query << it.second << ")";
-		db.executeQuery(query.str());
+	if (attributesSize > 0) {
+		query << "UPDATE `players` SET `supplystash` = " << db.escapeBlob(attributes, attributesSize);
+	}
+	else {
+		query << "UPDATE `players` SET `supplystash` = NULL";
+	}
+	query << " WHERE `id` = " << player->getGUID();
+
+	if (!db.executeQuery(query.str())) {
+		return false;
 	}
 
 	// learned spells

@@ -804,6 +804,7 @@ DepotLocker* Player::getDepotLocker(uint32_t depotId)
 	it = depotLockerMap.emplace(depotId, new DepotLocker(ITEM_LOCKER1)).first;
 	it->second->setDepotId(depotId);
 	it->second->internalAddThing(Item::CreateItem(ITEM_MARKET));
+	it->second->internalAddThing(Item::CreateItem(ITEM_SUPPLYSTASH));
 	it->second->internalAddThing(inbox);
 	it->second->internalAddThing(getDepotChest(depotId, true));
 	return it->second.get();
